@@ -1,0 +1,85 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum Rating {
+  EASY
+  OKAY
+  FORGOT
+}
+
+enum ProblemSource {
+  MANUAL
+  SYNC
+}
+
+model User {
+  id               String        @id @db.Uuid   // same as Supabase auth.users.id
+  email            String        @unique
+  leetcodeUsername String?
+  timezone         String        @default("UTC") // IANA, e.g. "Asia/Kolkata"
+  lastSyncedAt     DateTime?
+  createdAt        DateTime      @default(now())
+  problems         UserProblem[]
+}
+
+// Shared cache of LeetCode problem metadata
+model Problem {
+  number     Int           @id               // LeetCode frontend question number
+  title      String
+  titleSlug  String        @unique
+  difficulty Difficulty
+  topicTags  String[]
+  paidOnly   Boolean       @default(false)
+  userLinks  UserProblem[]
+}
+
+model UserProblem {
+  id            String        @id @default(cuid())
+  userId        String        @db.Uuid
+  problemNumber Int
+  notes         String        @default("")   // markdown
+  customTags    String[]
+  source        ProblemSource @default(MANUAL)
+  solvedAt      DateTime      @default(now())
+  stage         Int           @default(0)    // index into SRS intervals
+  nextReviewAt  DateTime
+  reviewCount   Int           @default(0)
+  lastReviewedAt DateTime?
+  archived      Boolean       @default(false) // "mastered", excluded from due list
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem Problem  @relation(fields: [problemNumber], references: [number])
+  reviews Review[]
+
+  @@unique([userId, problemNumber])
+  @@index([userId, nextReviewAt])
+}
+
+model Review {
+  id            String      @id @default(cuid())
+  userProblemId String
+  rating        Rating
+  reviewedAt    DateTime    @default(now())
+  stageBefore   Int
+  stageAfter    Int
+
+  userProblem UserProblem @relation(fields: [userProblemId], references: [id], onDelete: Cascade)
+
+  @@index([userProblemId])
+}

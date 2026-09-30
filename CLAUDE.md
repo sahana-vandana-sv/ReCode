@@ -363,10 +363,10 @@ Tagline, short explanation of the revision loop, "Get started" → login.
 
 ### Milestone 1 — Foundation
 - [x] Project scaffold, Tailwind, shadcn/ui init
-- [ ] Prisma schema + first migration against Supabase
-- [ ] Supabase Auth (Google + email magic link), `middleware.ts` session refresh, protected `(app)` layout
-- [ ] `getCurrentUser()` with User upsert on first login
-- [ ] App shell: sidebar/nav (Dashboard, Problems, Review, Settings), dark mode
+- [x] Prisma schema + first migration against Supabase
+- [x] Supabase Auth (Google + email magic link), `middleware.ts` session refresh, protected `(app)` layout
+- [x] `getCurrentUser()` with User upsert on first login
+- [x] App shell: sidebar/nav (Dashboard, Problems, Review, Settings), dark mode
 
 ### Milestone 2 — Problems & Notes
 - [ ] Seed script for `Problem` table
@@ -424,3 +424,9 @@ Tagline, short explanation of the revision loop, "Get started" → login.
 - **2026-09-27 — Prisma 6.19, not 7.** Prisma 7 moves datasource URLs into `prisma.config.ts` and requires driver adapters. Prisma 6 runs the schema in §6 unchanged (`url` + `directUrl`).
 - **2026-09-27 — `next build` uses webpack.** Turbopack is used for `next dev` only; Turbopack builds are still beta in 15.5.
 - **2026-09-27 — `next-themes` for dark mode.** This is shadcn's documented dark-mode approach. It isn't a UI library.
+- **2026-09-29 — RLS on every table, no policies.** Supabase serves `public` tables through its REST API using the public anon key. ReCode reads and writes only through Prisma (the table owner, which RLS doesn't restrict), so the init migration enables RLS with no policies, which closes that API. `_prisma_migrations` was set once with `prisma db execute`. **Every future migration that creates a table must add `ALTER TABLE "<Name>" ENABLE ROW LEVEL SECURITY;`.**
+- **2026-09-29 — `getClaims()` for auth checks.** Middleware and `getCurrentUser()` use `supabase.auth.getClaims()`, which verifies the JWT signature, not `getSession()`, which trusts the cookie as-is.
+- **2026-09-29 — After login, always go to `/dashboard`.** No `?next=` return path; this is simpler and avoids open-redirect checks. Revisit if deep links become important.
+- **2026-09-29 — Light/dark toggle only.** The theme defaults to the system setting; the header button switches between light and dark. Both icons render and CSS hides one, avoiding hydration mismatches.
+- **2026-09-29 — `font-sans` on `<body>`.** The shadcn-generated `globals.css` sets `--font-sans: var(--font-sans)` (self-referencing), and `next/font` defines `--font-sans` on `<body>`. Without `font-sans` on `<body>`, the page falls back to Times.
+- **2026-09-29 — One `.env` file.** Next.js and the Prisma CLI both read `.env`, so all variables live there instead of being split with `.env.local`. It's git-ignored via `.env*`.

@@ -369,9 +369,9 @@ Tagline, short explanation of the revision loop, "Get started" → login.
 - [x] App shell: sidebar/nav (Dashboard, Problems, Review, Settings), dark mode
 
 ### Milestone 2 — Problems & Notes
-- [ ] Seed script for `Problem` table
-- [ ] Add problem by number (with preview), lazy-fetch topic tags
-- [ ] Problems list with search + filters
+- [x] Seed script for `Problem` table
+- [x] Add problem by number (with preview), lazy-fetch topic tags
+- [x] Problems list with search + filters
 - [ ] Problem detail page: markdown notes, custom tags, delete/archive
 
 ### Milestone 3 — Revision Engine
@@ -391,6 +391,7 @@ Tagline, short explanation of the revision loop, "Get started" → login.
 - [ ] Landing page
 - [ ] Empty states, loading skeletons, error boundaries
 - [ ] Deploy to Vercel, set env vars, verify cron
+- [ ] Set the Vercel function region to `bom1` (same region as the DB) and revisit filter speed (see the 2026-10-09 Decisions Log entry)
 
 ### Future ideas
 - Daily reminder email via Resend ("5 problems due today")
@@ -430,3 +431,8 @@ Tagline, short explanation of the revision loop, "Get started" → login.
 - **2026-09-29 — Light/dark toggle only.** The theme defaults to the system setting; the header button switches between light and dark. Both icons render and CSS hides one, avoiding hydration mismatches.
 - **2026-09-29 — `font-sans` on `<body>`.** The shadcn-generated `globals.css` sets `--font-sans: var(--font-sans)` (self-referencing), and `next/font` defines `--font-sans` on `<body>`. Without `font-sans` on `<body>`, the page falls back to Times.
 - **2026-09-29 — One `.env` file.** Next.js and the Prisma CLI both read `.env`, so all variables live there instead of being split with `.env.local`. It's git-ignored via `.env*`.
+- **2026-10-08 — Seed settings stay in `package.json#prisma`.** Prisma 6 prints a deprecation warning and suggests `prisma.config.ts`, but in Prisma 6 that file stops the CLI from loading `.env` (so `DATABASE_URL`/`DIRECT_URL` would be missing). Keep `"prisma": { "seed": "tsx prisma/seed.ts" }` and ignore the warning until the move to Prisma 7.
+- **2026-10-08 — `computeNextReviewAt` added in Milestone 2.** Adding a problem needs its first review date (start of tomorrow in the user's timezone), so this one `srs.ts` function was written early; its unit tests come with the rest of `srs.ts` in Milestone 3.
+- **2026-10-08 — Empty `topicTags` means "not fetched yet".** The seed stores `[]` for every problem. `addProblem` fetches tags via the `questionData` GraphQL query the first time anyone adds a problem, saves them, and never blocks adding if LeetCode fails.
+- **2026-10-08 — Problem lookup is a Server Action.** `lookupProblem` is a read, not a mutation, but making it a Server Action keeps the "Add problem" dialog a simple two-step form (look up → add) with no extra API route.
+- **2026-10-09 — Filters live in the URL and run on the server; the measured lag is deferred.** Each filter change reloads `/problems` on the server, which runs ~3 queries one after another (user lookup, tag options, list). Measured from a dev Mac in India: ~35 ms network round trip to Supabase (ap-south-1), but ~200 ms per query through the transaction pooler (port 6543, ≈6 round trips) vs ~35 ms through the session pooler (port 5432), so ~0.7 s per filter change. Auth isn't a factor (ES256 keys, so `getClaims()` verifies locally). In production the overhead should mostly vanish if Vercel runs in `bom1` next to the DB. Deferred fixes: (1) for local dev only, point `DATABASE_URL` at the session pooler with `connection_limit=5` and no `pgbouncer` flag (production keeps 6543); (2) optionally filter in the browser so filter changes need no server round trip.

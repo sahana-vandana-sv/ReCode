@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AddProblemDialog } from "@/components/problems/add-problem-dialog";
+import { ProblemFilterBar } from "@/components/problems/problem-filter-bar";
 import { ProblemTable } from "@/components/problems/problem-table";
 import { requireUser } from "@/lib/auth";
 import { buildProblemWhere } from "@/lib/problem-filters";
@@ -18,8 +19,12 @@ export default async function ProblemsPage({
   const filters = problemFiltersSchema.parse(await searchParams);
   const now = new Date();
 
-  const [total, problems] = await Promise.all([
-    prisma.userProblem.count({ where: { userId: user.id } }),
+  const [allProblems, problems] = await Promise.all([
+    // Every problem's tags, for the filter dropdowns.
+    prisma.userProblem.findMany({
+      where: { userId: user.id },
+      select: { customTags: true, problem: { select: { topicTags: true } } },
+    }),
     prisma.userProblem.findMany({
       where: buildProblemWhere(user.id, filters, endOfDayIn(now, user.timezone)),
       // Most overdue first.
@@ -33,6 +38,10 @@ export default async function ProblemsPage({
       },
     }),
   ]);
+
+  const total = allProblems.length;
+  const topicTags = uniqueSorted(allProblems.flatMap((p) => p.problem.topicTags));
+  const customTags = uniqueSorted(allProblems.flatMap((p) => p.customTags));
 
   const rows = problems.map((p) => ({
     number: p.problemNumber,
@@ -55,16 +64,31 @@ export default async function ProblemsPage({
         <p className="text-muted-foreground">
           No problems yet. Add one you&apos;ve solved.
         </p>
-      ) : rows.length === 0 ? (
-        <p className="text-muted-foreground">No problems match these filters.</p>
       ) : (
-        <div className="grid gap-2">
-          <p className="text-sm text-muted-foreground">
-            Showing {rows.length} of {total}
-          </p>
-          <ProblemTable rows={rows} />
+        <div className="grid gap-4">
+          <ProblemFilterBar
+            filters={filters}
+            topicTags={topicTags}
+            customTags={customTags}
+          />
+          {rows.length === 0 ? (
+            <p className="text-muted-foreground">
+              No problems match these filters.
+            </p>
+          ) : (
+            <div className="grid gap-2">
+              <p className="text-sm text-muted-foreground">
+                Showing {rows.length} of {total}
+              </p>
+              <ProblemTable rows={rows} />
+            </div>
+          )}
         </div>
       )}
     </div>
   );
+}
+
+function uniqueSorted(values: string[]) {
+  return [...new Set(values)].sort((a, b) => a.localeCompare(b));
 }
